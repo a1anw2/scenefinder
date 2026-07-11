@@ -62,7 +62,7 @@ async function extractFrames(videoPath: string, outputDir: string): Promise<stri
     ffmpeg.stderr.on('data', (chunk) => {
         stderr += chunk.toString();
     });
-    await new Promise((res, rej) => {
+    await new Promise<void>((res, rej) => {
         ffmpeg.on('close', (code) => {
             if (code !== 0) {
                 rej(new Error(`ffmpeg exited with code ${code}: ${stderr.trim()}`));

@@ -6,7 +6,7 @@ import { fileURLToPath } from 'url';
 import { config } from '../config/index.js';
 
 export class LanceDBClient {
-    private database: lancedb.Database | null = null;
+    private connection: lancedb.Connection | null = null;
     private table: lancedb.Table | null = null;
 
     constructor() {
@@ -17,11 +17,11 @@ export class LanceDBClient {
 
     async init() {
         const dbPath = this.getDbPath();
-        this.database = await lancedb.connect(dbPath);
-        const tableNames = await this.database.tableNames();
+        this.connection = await lancedb.connect(dbPath);
+        const tableNames = await this.connection.tableNames();
         if (!tableNames.includes(config.lancedb.tableName)) {
             try {
-                this.table = await this.database.createTable(config.lancedb.tableName, [
+                this.table = await this.connection.createTable(config.lancedb.tableName, [
                     {
                         id: '__init__',
                         vector: new Float32Array(config.embedding.dimensions),
@@ -34,11 +34,11 @@ export class LanceDBClient {
             }
             catch {
                 // Another process may have created the table concurrently; fall back.
-                this.table = await this.database.openTable(config.lancedb.tableName);
+                this.table = await this.connection.openTable(config.lancedb.tableName);
             }
         }
         else {
-            this.table = await this.database.openTable(config.lancedb.tableName);
+            this.table = await this.connection.openTable(config.lancedb.tableName);
         }
     }
 

@@ -1,0 +1,28 @@
+{
+  "ai": {
+    "url": "http://localhost:1234/v1/chat/completions",
+    "model": "google/gemma-4-12b-qat"
+  },
+  "embedding": {
+    "model": "Xenova/all-MiniLM-L6-v2",
+    "dimensions": 384,
+    "cacheDir": "./cache/hf"
+  },
+  "lancedb": {
+    "path": "./lancedb.db",
+    "tableName": "scenes"
+  },
+  "image": {
+    "width": 512,
+    "height": 512,
+    "quality": 85,
+    "thumbnailWidth": 100,
+    "thumbnailHeight": 100
+  },
+  "ffmpeg": {
+    "path": "/usr/bin/ffmpeg",
+    "inputPath": "input.mp4",
+    "outputDir": "./output",
+    "captureInterval": 10
+  }
+}

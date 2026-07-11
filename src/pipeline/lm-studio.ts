@@ -1,5 +1,6 @@
 /** LM Studio integration for scene description generation via OpenAI-compatible API. */
 import axios from 'axios';
+import type { AxiosInstance } from 'axios';
 import { config } from '../config/index.js';
 
 const VISION_TIMEOUT_MS = 120_000;
@@ -88,7 +89,7 @@ function sleep(ms: number): Promise<void> {
 }
 
 export class LMStudioClient {
-    private client: axios.AxiosInstance;
+    private client: AxiosInstance;
 
     constructor() {
         this.client = axios.create({

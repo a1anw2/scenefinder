@@ -5,9 +5,10 @@
  * produces 384-dimensional vectors. Runs entirely in-process (no external API).
  */
 import { pipeline, env } from '@huggingface/transformers';
+import type { AllTasks } from '@huggingface/transformers';
 
-let _extractor: ReturnType<typeof pipeline> | null = null;
-let _initPromise: Promise<void> | null = null;
+let _extractor: AllTasks['feature-extraction'] | null = null;
+let _initPromise: Promise<AllTasks['feature-extraction']> | null = null;
 
 interface EmbeddingConfig {
     model: string;
@@ -23,12 +24,12 @@ export async function generateEmbedding(text: string, config: { embedding: Embed
     if (!_initPromise) {
         _initPromise = (async () => {
             env.cacheDir = config.embedding.cacheDir;
-            const p = await pipeline('feature-extraction', config.embedding.model);
-            _extractor = p;
+            const extractor = await pipeline('feature-extraction', config.embedding.model);
+            _extractor = extractor;
+            return extractor;
         })();
     }
-    await _initPromise;
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-    const output = await _extractor(text, { pooling: 'mean', normalize: true });
+    const extractor = await _initPromise;
+    const output = await extractor(text, { pooling: 'mean', normalize: true });
     return Array.from(output.data);
 }
