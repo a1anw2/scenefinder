@@ -120,6 +120,12 @@ async function processSingleFrame(file: string, index: number, total: number, vi
 async function analyzeAndStore(file: string, index: number, total: number, videoPath: string, inputPath: string, db: LanceDBClient, processor: ImageProcessor) {
     const frameNum = parseFrameNumber(file);
     const offsetSeconds = frameNum * config.ffmpeg.captureInterval;
+
+    if (await db.sceneExists(videoPath, offsetSeconds)) {
+        console.log(`  ${file}: ${index + 1} of ${total} — already indexed (skipped).`);
+        return;
+    }
+
     const resizedPath = inputPath.replace('.jpg', '_resized.jpg');
     const desc = await describeFrame(processor, resizedPath, offsetSeconds);
     if (isCreditsDescription(desc)) {

@@ -68,6 +68,16 @@ export class LanceDBClient {
         await this.table.optimize();
     }
 
+    async sceneExists(videoPath: string, offsetSeconds: number): Promise<boolean> {
+        if (!this.table) {
+            throw new Error('LanceDB table not initialized');
+        }
+        const escapedPath = videoPath.replace(/'/g, "''");
+        const filter = `video_path = '${escapedPath}' AND offset_seconds = ${offsetSeconds}`;
+        const count = await this.table.countRows(filter);
+        return count > 0;
+    }
+
     async getStats() {
         if (!this.table) {
             throw new Error('LanceDB table not initialized');
