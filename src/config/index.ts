@@ -1,17 +1,15 @@
 /**
- * Application configuration
+ * Application configuration — matches config.json schema.
  */
 export interface AppConfig {
-  ffmpeg: {
-    inputPath: string;
-    outputDir: string;
-    captureInterval: number; // seconds
-  };
-  lmStudio: {
-    host: string;
-    port: number;
+  ai: {
+    url: string;
     model: string;
-    maxTokens: number;
+  };
+  embedding: {
+    model: string;
+    dimensions: number;
+    cacheDir: string;
   };
   lancedb: {
     path: string;
@@ -21,20 +19,26 @@ export interface AppConfig {
     width: number;
     height: number;
     quality: number;
+    thumbnailWidth: number;
+    thumbnailHeight: number;
+  };
+  ffmpeg: {
+    path: string;
+    inputPath: string;
+    outputDir: string;
+    captureInterval: number; // seconds
   };
 }
 
 export const config: AppConfig = {
-  ffmpeg: {
-    inputPath: './input/video.mp4', // Change this to your video file path
-    outputDir: './output/frames',
-    captureInterval: 5, // Capture every 5 seconds
+  ai: {
+    url: 'http://localhost:1234',
+    model: 'gemma-7b',
   },
-  lmStudio: {
-    host: 'localhost',
-    port: 1234,
-    model: 'gemma-7b', // Adjust based on your loaded model
-    maxTokens: 200,
+  embedding: {
+    model: 'Xenova/all-MiniLM-L6-v2',
+    dimensions: 384,
+    cacheDir: './.cache',
   },
   lancedb: {
     path: './lancedb.db',
@@ -44,5 +48,13 @@ export const config: AppConfig = {
     width: 512,
     height: 512,
     quality: 85,
+    thumbnailWidth: 512,
+    thumbnailHeight: 512,
+  },
+  ffmpeg: {
+    path: 'ffmpeg',
+    inputPath: './input/video.mp4', // Change this to your video file path
+    outputDir: './output/frames',
+    captureInterval: 5, // Capture every 5 seconds
   },
 };
