@@ -2,6 +2,8 @@
 
 Find scenes in movies through AI/RAG — extract frames from video files, describe them with a vision model, embed the descriptions, and store them in a vector database for natural-language search.
 
+> **Built entirely by Qwen 3.6 (unsloth)** — this project was written end-to-end by an AI coding agent using Qwen 3.6 35b (unsloth) as the reasoning model, with iterative refinement through TypeScript compilation feedback loops. No human-authored code is present in this repository.
+
 ## Prerequisites
 
 | Requirement | Purpose |
