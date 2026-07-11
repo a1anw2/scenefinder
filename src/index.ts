@@ -107,7 +107,7 @@ async function processSingleFrame(file: string, index: number, total: number, vi
     const resizedPath = inputPath.replace('.jpg', '_resized.jpg');
     try {
         await resizeFrame(inputPath, resizedPath);
-        await analyzeAndStore(file, index, total, videoPath, db, processor);
+        await analyzeAndStore(file, index, total, videoPath, inputPath, db, processor);
     }
     catch (error) {
         console.error(`  ${file}: ${index + 1} of ${total} failed — skipping.`, error instanceof Error ? error.message : String(error));
@@ -117,10 +117,10 @@ async function processSingleFrame(file: string, index: number, total: number, vi
     }
 }
 
-async function analyzeAndStore(file: string, index: number, total: number, videoPath: string, db: LanceDBClient, processor: ImageProcessor) {
+async function analyzeAndStore(file: string, index: number, total: number, videoPath: string, inputPath: string, db: LanceDBClient, processor: ImageProcessor) {
     const frameNum = parseFrameNumber(file);
     const offsetSeconds = frameNum * config.ffmpeg.captureInterval;
-    const resizedPath = path.join(config.ffmpeg.outputDir, file).replace('.jpg', '_resized.jpg');
+    const resizedPath = inputPath.replace('.jpg', '_resized.jpg');
     const desc = await describeFrame(processor, resizedPath, offsetSeconds);
     if (isCreditsDescription(desc)) {
         console.log(`  ${file}: ${index + 1} of ${total} — credit sequence (skipped). ${desc.slice(0, 80)}`);
@@ -143,10 +143,6 @@ function parseFrameNumber(file: string): number {
     return parseInt(match[1], 10);
 }
 
-async function processFrame(file: string, index: number, total: number, videoPath: string, outputDir: string, db: LanceDBClient, processor: ImageProcessor) {
-    await processSingleFrame(file, index, total, videoPath, outputDir, db, processor);
-}
-
 async function processVideo(videoPath: string, db: LanceDBClient, processor: ImageProcessor) {
     const outputDir = config.ffmpeg.outputDir;
     console.log(`\nProcessing: ${videoPath}`);
@@ -156,7 +152,7 @@ async function processVideo(videoPath: string, db: LanceDBClient, processor: Ima
         return;
     }
     for (let i = 0; i < files.length; i++) {
-        await processFrame(files[i], i, files.length, videoPath, outputDir, db, processor);
+        await processSingleFrame(files[i], i, files.length, videoPath, outputDir, db, processor);
     }
 }
 

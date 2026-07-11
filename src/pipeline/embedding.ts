@@ -9,6 +9,7 @@ import type { AllTasks } from '@huggingface/transformers';
 
 let _extractor: AllTasks['feature-extraction'] | null = null;
 let _initPromise: Promise<AllTasks['feature-extraction']> | null = null;
+let _initFailed = false;
 
 interface EmbeddingConfig {
     model: string;
@@ -21,15 +22,22 @@ export async function generateEmbedding(text: string, config: { embedding: Embed
         const output = await _extractor(text, { pooling: 'mean', normalize: true });
         return Array.from(output.data);
     }
-    if (!_initPromise) {
+    if (!_initPromise && !_initFailed) {
         _initPromise = (async () => {
             env.cacheDir = config.embedding.cacheDir;
             const extractor = await pipeline('feature-extraction', config.embedding.model);
             _extractor = extractor;
             return extractor;
-        })();
+        })().catch((err: unknown) => {
+            _initPromise = null;
+            _initFailed = true;
+            throw err;
+        });
     }
-    const extractor = await _initPromise;
+    if (_initFailed) {
+        throw new Error('Embedding model failed to initialize. Ensure sufficient disk space and network connectivity, then retry.');
+    }
+    const extractor = await _initPromise!;
     const output = await extractor(text, { pooling: 'mean', normalize: true });
     return Array.from(output.data);
 }

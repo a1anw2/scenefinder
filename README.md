@@ -26,37 +26,37 @@ npm install
 
 ## Configuration
 
-Edit `config.json` to match your environment:
+Edit `src/config/index.ts` to match your environment. The file contains hardcoded defaults that the application reads at runtime:
 
-```json
-{
-  "ai": {
-    "url": "http://localhost:1234/v1/chat/completions",
-    "model": "google/gemma-4-12b-qat"
+```ts
+export const config: AppConfig = {
+  ai: {
+    url: 'http://localhost:1234',
+    model: 'gemma-7b',
   },
-  "embedding": {
-    "model": "Xenova/all-MiniLM-L6-v2",
-    "dimensions": 384,
-    "cacheDir": "./cache/hf"
+  embedding: {
+    model: 'Xenova/all-MiniLM-L6-v2',
+    dimensions: 384,
+    cacheDir: './.cache',
   },
-  "lancedb": {
-    "path": "./lancedb.db",
-    "tableName": "scenes"
+  lancedb: {
+    path: './lancedb.db',
+    tableName: 'scenes',
   },
-  "image": {
-    "width": 512,
-    "height": 512,
-    "quality": 85,
-    "thumbnailWidth": 100,
-    "thumbnailHeight": 100
+  image: {
+    width: 512,
+    height: 512,
+    quality: 85,
+    thumbnailWidth: 512,
+    thumbnailHeight: 512,
   },
-  "ffmpeg": {
-    "path": "/usr/bin/ffmpeg",
-    "inputPath": "input.mp4",
-    "outputDir": "./output",
-    "captureInterval": 10
-  }
-}
+  ffmpeg: {
+    path: 'ffmpeg',
+    inputPath: './input/video.mp4',
+    outputDir: './output/frames',
+    captureInterval: 5,
+  },
+};
 ```
 
 ### Key settings
@@ -118,6 +118,6 @@ src/
 
 ## Troubleshooting
 
-- **"LM Studio is not reachable"** — Ensure LM Studio is running and the model is loaded. Check `ai.url` in `config.json`.
+- **"LM Studio is not reachable"** — Ensure LM Studio is running and the model is loaded. Check `ai.url` in `src/config/index.ts`.
 - **"No frames extracted"** — Verify FFmpeg is installed and `ffmpeg.path` points to the correct binary.
 - **Empty search results** — Run the indexing pipeline first. The LanceDB database starts empty.

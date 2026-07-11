@@ -21,16 +21,9 @@ export class LanceDBClient {
         const tableNames = await this.connection.tableNames();
         if (!tableNames.includes(config.lancedb.tableName)) {
             try {
-                this.table = await this.connection.createTable(config.lancedb.tableName, [
-                    {
-                        id: '__init__',
-                        vector: new Float32Array(config.embedding.dimensions),
-                        description: '',
-                        video_path: '',
-                        offset_seconds: 0,
-                    },
-                ]);
-                await this.table.delete("id = '__init__'");
+                // Create an empty schema so LanceDB knows the table structure.
+                const emptySchema: Array<Record<string, unknown>> = [];
+                this.table = await this.connection.createTable(config.lancedb.tableName, emptySchema);
             }
             catch {
                 // Another process may have created the table concurrently; fall back.

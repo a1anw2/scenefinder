@@ -1,38 +1,30 @@
 /**
- * Image processing utilities for frame extraction and resizing
+ * Image processing utilities for frame extraction and resizing.
  */
 import sharp from 'sharp';
 import { config } from '../config/index.js';
 
-export async function resizeFrame(inputPath: string, outputPath: string) {
-    const processor = new ImageProcessor();
-    await processor.resizeImage(inputPath, outputPath);
+export async function resizeFrame(inputPath: string, outputPath?: string): Promise<void> {
+    const width = config.image.width;
+    const height = config.image.height;
+    const output = outputPath || inputPath.replace('.jpg', '_resized.jpg');
+    const { info, data } = await sharp(inputPath)
+        .resize(width, height, {
+            fit: 'cover',
+            position: 'center',
+        })
+        .jpeg({ quality: config.image.quality })
+        .toBuffer({ resolveWithObject: true });
+    await sharp(data).toFile(output);
 }
 
 export class ImageProcessor {
     /**
-     * Resize image to configured dimensions
+     * Resize image to configured dimensions.
      */
     async resizeImage(inputPath: string, outputPath?: string) {
         try {
-            const width = config.image.width;
-            const height = config.image.height;
-            const output = outputPath || inputPath.replace('.jpg', '_resized.jpg');
-            const { info, data } = await sharp(inputPath)
-                .resize(width, height, {
-                    fit: 'cover',
-                    position: 'center',
-                })
-                .jpeg({ quality: config.image.quality })
-                .toBuffer({ resolveWithObject: true });
-            await sharp(data).toFile(output);
-            const fileSize = data.length;
-            return {
-                path: output,
-                width: info.width ?? width,
-                height: info.height ?? height,
-                size: fileSize,
-            };
+            await resizeFrame(inputPath, outputPath);
         }
         catch (error) {
             console.error('Error resizing image:', error);
@@ -41,7 +33,7 @@ export class ImageProcessor {
     }
 
     /**
-     * Convert image to base64 for API transmission
+     * Convert image to base64 for API transmission.
      */
     async imageToBase64(imagePath: string) {
         try {

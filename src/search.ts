@@ -34,8 +34,15 @@ async function main() {
         printUsage();
         process.exit(1);
     }
-    const db = new LanceDBClient();
-    await db.init();
+    let db: LanceDBClient;
+    try {
+        db = new LanceDBClient();
+        await db.init();
+    }
+    catch (err) {
+        console.error(`Failed to initialize database: ${err instanceof Error ? err.message : String(err)}`);
+        process.exit(1);
+    }
     const embedding = await generateEmbedding(query, config);
     const results = await db.searchScenes(query, embedding, limit);
     if (results.length === 0) {

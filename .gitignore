@@ -144,3 +144,5 @@ vite.config.ts.timestamp-*
 
 lancedb.db/
 config.json
+output/
+cache/
