@@ -7,6 +7,7 @@ import { ImageProcessor, resizeFrame } from './pipeline/image-processor.js';
 import { lmStudioClient, isCreditsDescription } from './pipeline/lm-studio.js';
 import { LanceDBClient } from './pipeline/lancedb.js';
 import { generateEmbedding } from './pipeline/embedding.js';
+import { normalizeVideoPath } from './pipeline/video-path.js';
 
 const VIDEO_EXTENSIONS = ['.mp4', '.mov', '.mpv', '.avi', '.mkv', '.webm'];
 
@@ -109,15 +110,15 @@ interface PendingScene {
     embedding: number[];
 }
 
-async function processSingleFrame(file: string, index: number, total: number, videoPath: string, outputDir: string, processor: ImageProcessor): Promise<PendingScene | null> {
+async function processSingleFrame(file: string, index: number, total: number, videoKey: string, outputDir: string, processor: ImageProcessor): Promise<PendingScene | null> {
     const inputPath = path.join(outputDir, file);
     const resizedPath = inputPath.replace('.jpg', '_resized.jpg');
     try {
         await resizeFrame(inputPath, resizedPath);
-        return await analyzeAndStore(file, index, total, videoPath, inputPath, processor);
+        return await analyzeAndStore(file, index, total, videoKey, inputPath, processor);
     }
     catch (error) {
-        console.error(`  ${file}: ${index + 1} of ${total} failed — skipping.`, error instanceof Error ? error.message : String(error));
+        console.error(`  ${path.basename(videoKey)} — ${file}: ${index + 1} of ${total} failed — skipping.`, error instanceof Error ? error.message : String(error));
         return null;
     }
     finally {
@@ -125,7 +126,7 @@ async function processSingleFrame(file: string, index: number, total: number, vi
     }
 }
 
-async function analyzeAndStore(file: string, index: number, total: number, videoPath: string, inputPath: string, processor: ImageProcessor): Promise<PendingScene | null> {
+async function analyzeAndStore(file: string, index: number, total: number, videoKey: string, inputPath: string, processor: ImageProcessor): Promise<PendingScene | null> {
     const frameNum = parseFrameNumber(file);
     const offsetSeconds = frameNum * config.ffmpeg.captureInterval;
 
@@ -134,12 +135,12 @@ async function analyzeAndStore(file: string, index: number, total: number, video
     const resizedPath = inputPath.replace('.jpg', '_resized.jpg');
     const desc = await describeFrame(processor, resizedPath, offsetSeconds);
     if (isCreditsDescription(desc)) {
-        console.log(`  ${file}: ${index + 1} of ${total} — credit sequence (skipped). ${desc.slice(0, 80)}`);
+        console.log(`  ${path.basename(videoKey)} — ${file}: ${index + 1} of ${total} — credit sequence (skipped). ${desc.slice(0, 80)}`);
         return null;
     }
     const embedding = await generateEmbedding(desc, config);
-    console.log(`  ${file}: ${index + 1} of ${total} completed. ${desc.slice(0, 80)}`);
-    return { description: desc, videoPath, offsetSeconds, embedding };
+    console.log(`  ${path.basename(videoKey)} — ${file}: ${index + 1} of ${total} completed. ${desc.slice(0, 80)}`);
+    return { description: desc, videoPath: videoKey, offsetSeconds, embedding };
 }
 
 let currentDb: LanceDBClient | null = null;
@@ -156,7 +157,7 @@ async function safeFlush(db: LanceDBClient, batch: PendingScene[]) {
         batch.length = 0;
     }
     catch (error) {
-        console.error(`  Failed to write batch of ${batch.length} scene(s) — dropping and continuing.`, error instanceof Error ? error.message : String(error));
+        console.error(`  ${path.basename(batch[0].videoPath)} — failed to write batch of ${batch.length} scene(s) — dropping and continuing.`, error instanceof Error ? error.message : String(error));
         batch.length = 0;
     }
 }
@@ -171,7 +172,8 @@ function parseFrameNumber(file: string): number {
 
 async function processVideo(videoPath: string, db: LanceDBClient, processor: ImageProcessor) {
     console.log(`\nProcessing: ${videoPath}`);
-    if (await db.videoIndexed(videoPath)) {
+    const videoKey = normalizeVideoPath(videoPath);
+    if (await db.videoIndexed(videoKey)) {
         console.log(`  Already indexed — skipping.`);
         return;
     }
@@ -185,7 +187,7 @@ async function processVideo(videoPath: string, db: LanceDBClient, processor: Ima
     currentDb = db;
     currentBatch = batch;
     for (let i = 0; i < files.length; i++) {
-        const scene = await processSingleFrame(files[i], i, files.length, videoPath, outputDir, processor);
+        const scene = await processSingleFrame(files[i], i, files.length, videoKey, outputDir, processor);
         if (scene) {
             batch.push(scene);
         }
