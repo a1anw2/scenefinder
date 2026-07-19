@@ -12,14 +12,17 @@
     "format": "prettier --write \"src/**/*.ts\"",
     "search": "tsx src/search.ts",
     "inspect": "tsx src/inspect.js",
-    "compact": "tsx src/compact.ts"
+    "compact": "tsx src/compact.ts",
+    "server": "tsx src/server.ts"
   },
   "dependencies": {
     "@huggingface/transformers": "^4.2.0",
     "@lancedb/lancedb": "^0.31.0",
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "axios": "^1.18.1",
     "fluent-ffmpeg": "^2.1.3",
-    "sharp": "^0.35.3"
+    "sharp": "^0.35.3",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@types/fluent-ffmpeg": "^2.1.27",

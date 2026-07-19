@@ -54,13 +54,23 @@ export class LanceDBClient {
         return records.map((record) => record.id);
     }
 
-    async searchScenes(query: string, embedding: number[], limit = 5) {
+    async searchScenes(query: string, embedding: number[], limit = 5, offset = 0) {
         if (!this.table) {
             throw new Error('LanceDB table not initialized');
         }
         const vector = new Float32Array(embedding);
-        const results = await this.table.search(vector).limit(limit).toArray();
+        const results = await this.table.search(vector).limit(limit).offset(offset).toArray();
         return results;
+    }
+
+    /** Look up a single scene row by its LanceDB id (e.g. "scene_<uuid>"), or null if not found. */
+    async getSceneById(id: string): Promise<Record<string, unknown> | null> {
+        if (!this.table) {
+            throw new Error('LanceDB table not initialized');
+        }
+        const escapedId = id.replace(/'/g, "''");
+        const rows = await this.table.query().where(`id = '${escapedId}'`).limit(1).toArray();
+        return rows.length > 0 ? rows[0] : null;
     }
 
     async optimize() {

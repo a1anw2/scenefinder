@@ -12,6 +12,9 @@
     "path": "./lancedb.db",
     "tableName": "scenes"
   },
+  "media": {
+    "root": "/path/to/movies/mount"
+  },
   "image": {
     "width": 512,
     "height": 512,
@@ -24,5 +27,15 @@
     "inputPath": "input.mp4",
     "outputDir": "./output",
     "captureInterval": 10
+  },
+  "server": {
+    "host": "0.0.0.0",
+    "port": 19720,
+    "publicUrl": "http://localhost:19720",
+    "authToken": ""
+  },
+  "cache": {
+    "dir": "./cache/frames",
+    "maxAgeHours": 24
   }
 }

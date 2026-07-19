@@ -20,6 +20,11 @@ export interface AppConfig {
     tableName: string;
     batchSize: number;
   };
+  media: {
+    // Mount root that "_movies/<year>/<name>" keys (see pipeline/video-path.ts) are resolved
+    // against on this machine, to turn a stored video_path back into a real file for ffmpeg.
+    root: string;
+  };
   image: {
     width: number;
     height: number;
@@ -32,6 +37,20 @@ export interface AppConfig {
     inputPath: string;
     outputDir: string;
     captureInterval: number; // seconds
+  };
+  server: {
+    host: string; // bind address, e.g. '0.0.0.0'
+    port: number;
+    // Base URL clients can actually reach (0.0.0.0 isn't a valid client-facing address), embedded
+    // in image_url values returned by the search_scene MCP tool, e.g. 'http://kismet.lan:19720'.
+    publicUrl: string;
+    // Shared secret required on /mcp (Authorization: Bearer) and /image (?token=) requests.
+    // Empty disables auth entirely — auth is opt-in, not required.
+    authToken: string;
+  };
+  cache: {
+    dir: string; // extracted frame cache, keyed by LanceDB row id
+    maxAgeHours: number;
   };
 }
 
@@ -50,6 +69,9 @@ const defaults: AppConfig = {
     tableName: 'scenes',
     batchSize: 50,
   },
+  media: {
+    root: '',
+  },
   image: {
     width: 512,
     height: 512,
@@ -62,6 +84,16 @@ const defaults: AppConfig = {
     inputPath: './input/video.mp4',
     outputDir: './output/frames',
     captureInterval: 5,
+  },
+  server: {
+    host: '0.0.0.0',
+    port: 19720,
+    publicUrl: 'http://localhost:19720',
+    authToken: '',
+  },
+  cache: {
+    dir: './cache/frames',
+    maxAgeHours: 24,
   },
 };
 
