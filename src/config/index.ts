@@ -18,6 +18,7 @@ export interface AppConfig {
   lancedb: {
     path: string;
     tableName: string;
+    batchSize: number;
   };
   image: {
     width: number;
@@ -47,6 +48,7 @@ const defaults: AppConfig = {
   lancedb: {
     path: './lancedb.db',
     tableName: 'scenes',
+    batchSize: 50,
   },
   image: {
     width: 512,

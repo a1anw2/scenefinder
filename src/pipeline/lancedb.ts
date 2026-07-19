@@ -35,21 +35,25 @@ export class LanceDBClient {
         }
     }
 
-    async upsertScene(data: { description: string; videoPath: string; offsetSeconds: number }, embedding: number[]) {
+    /** Insert a batch of scenes in a single write, producing one Lance fragment/version instead of one per row. */
+    async upsertScenes(rows: Array<{ description: string; videoPath: string; offsetSeconds: number; embedding: number[] }>) {
         if (!this.table) {
             throw new Error('LanceDB table not initialized');
         }
-        const id = `scene_${crypto.randomUUID()}`;
-        await this.table.add([
-            {
-                id,
-                vector: new Float32Array(embedding),
-                description: data.description,
-                video_path: data.videoPath,
-                offset_seconds: data.offsetSeconds,
-            },
-        ]);
-        return id;
+        if (rows.length === 0) {
+            return [];
+        }
+        const ids = rows.map(() => `scene_${crypto.randomUUID()}`);
+        await this.table.add(
+            rows.map((row, i) => ({
+                id: ids[i],
+                vector: new Float32Array(row.embedding),
+                description: row.description,
+                video_path: row.videoPath,
+                offset_seconds: row.offsetSeconds,
+            })),
+        );
+        return ids;
     }
 
     async searchScenes(query: string, embedding: number[], limit = 5) {
@@ -65,7 +69,9 @@ export class LanceDBClient {
         if (!this.table) {
             throw new Error('LanceDB table not initialized');
         }
-        await this.table.optimize();
+        // deleteUnverified is safe only because this client is the sole writer (embedded, single-process);
+        // without it, compacted-away fragments and old versions stay on disk for 7 days regardless of cleanupOlderThan.
+        return this.table.optimize({ cleanupOlderThan: new Date(), deleteUnverified: true });
     }
 
     async sceneExists(videoPath: string, offsetSeconds: number): Promise<boolean> {

@@ -102,43 +102,55 @@ async function describeFrame(processor: ImageProcessor, resizedPath: string, off
     return lmStudioClient.describeScene(base64, offsetSeconds);
 }
 
-async function processSingleFrame(file: string, index: number, total: number, videoPath: string, outputDir: string, db: LanceDBClient, processor: ImageProcessor) {
+interface PendingScene {
+    description: string;
+    videoPath: string;
+    offsetSeconds: number;
+    embedding: number[];
+}
+
+async function processSingleFrame(file: string, index: number, total: number, videoPath: string, outputDir: string, db: LanceDBClient, processor: ImageProcessor): Promise<PendingScene | null> {
     const inputPath = path.join(outputDir, file);
     const resizedPath = inputPath.replace('.jpg', '_resized.jpg');
     try {
         await resizeFrame(inputPath, resizedPath);
-        await analyzeAndStore(file, index, total, videoPath, inputPath, db, processor);
+        return await analyzeAndStore(file, index, total, videoPath, inputPath, db, processor);
     }
     catch (error) {
         console.error(`  ${file}: ${index + 1} of ${total} failed — skipping.`, error instanceof Error ? error.message : String(error));
+        return null;
     }
     finally {
         await cleanupFrame(inputPath, resizedPath);
     }
 }
 
-async function analyzeAndStore(file: string, index: number, total: number, videoPath: string, inputPath: string, db: LanceDBClient, processor: ImageProcessor) {
+async function analyzeAndStore(file: string, index: number, total: number, videoPath: string, inputPath: string, db: LanceDBClient, processor: ImageProcessor): Promise<PendingScene | null> {
     const frameNum = parseFrameNumber(file);
     const offsetSeconds = frameNum * config.ffmpeg.captureInterval;
 
     if (await db.sceneExists(videoPath, offsetSeconds)) {
         console.log(`  ${file}: ${index + 1} of ${total} — already indexed (skipped).`);
-        return;
+        return null;
     }
 
     const resizedPath = inputPath.replace('.jpg', '_resized.jpg');
     const desc = await describeFrame(processor, resizedPath, offsetSeconds);
     if (isCreditsDescription(desc)) {
         console.log(`  ${file}: ${index + 1} of ${total} — credit sequence (skipped). ${desc.slice(0, 80)}`);
-        return;
+        return null;
     }
     const embedding = await generateEmbedding(desc, config);
-    await db.upsertScene({ description: desc, videoPath, offsetSeconds }, embedding);
     console.log(`  ${file}: ${index + 1} of ${total} completed. ${desc.slice(0, 80)}`);
-    if ((index + 1) % 100 === 0) {
-        await db.optimize();
-        console.log(`  Optimized LanceDB table after ${index + 1} writes.`);
+    return { description: desc, videoPath, offsetSeconds, embedding };
+}
+
+async function flushBatch(db: LanceDBClient, batch: PendingScene[]) {
+    if (batch.length === 0) {
+        return;
     }
+    await db.upsertScenes(batch);
+    batch.length = 0;
 }
 
 function parseFrameNumber(file: string): number {
@@ -157,9 +169,19 @@ async function processVideo(videoPath: string, db: LanceDBClient, processor: Ima
         console.warn(`  No frames extracted from ${videoPath}`);
         return;
     }
+    const batch: PendingScene[] = [];
     for (let i = 0; i < files.length; i++) {
-        await processSingleFrame(files[i], i, files.length, videoPath, outputDir, db, processor);
+        const scene = await processSingleFrame(files[i], i, files.length, videoPath, outputDir, db, processor);
+        if (scene) {
+            batch.push(scene);
+        }
+        if (batch.length >= config.lancedb.batchSize) {
+            await flushBatch(db, batch);
+        }
     }
+    await flushBatch(db, batch);
+    await db.optimize();
+    console.log(`  Optimized LanceDB table after ${videoPath}.`);
 }
 
 async function run() {
