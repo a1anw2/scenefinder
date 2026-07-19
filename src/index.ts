@@ -109,12 +109,12 @@ interface PendingScene {
     embedding: number[];
 }
 
-async function processSingleFrame(file: string, index: number, total: number, videoPath: string, outputDir: string, db: LanceDBClient, processor: ImageProcessor): Promise<PendingScene | null> {
+async function processSingleFrame(file: string, index: number, total: number, videoPath: string, outputDir: string, processor: ImageProcessor): Promise<PendingScene | null> {
     const inputPath = path.join(outputDir, file);
     const resizedPath = inputPath.replace('.jpg', '_resized.jpg');
     try {
         await resizeFrame(inputPath, resizedPath);
-        return await analyzeAndStore(file, index, total, videoPath, inputPath, db, processor);
+        return await analyzeAndStore(file, index, total, videoPath, inputPath, processor);
     }
     catch (error) {
         console.error(`  ${file}: ${index + 1} of ${total} failed — skipping.`, error instanceof Error ? error.message : String(error));
@@ -125,15 +125,12 @@ async function processSingleFrame(file: string, index: number, total: number, vi
     }
 }
 
-async function analyzeAndStore(file: string, index: number, total: number, videoPath: string, inputPath: string, db: LanceDBClient, processor: ImageProcessor): Promise<PendingScene | null> {
+async function analyzeAndStore(file: string, index: number, total: number, videoPath: string, inputPath: string, processor: ImageProcessor): Promise<PendingScene | null> {
     const frameNum = parseFrameNumber(file);
     const offsetSeconds = frameNum * config.ffmpeg.captureInterval;
 
-    if (await db.sceneExists(videoPath, offsetSeconds)) {
-        console.log(`  ${file}: ${index + 1} of ${total} — already indexed (skipped).`);
-        return null;
-    }
-
+    // No per-frame existence check here: processVideo already skips this whole video via
+    // db.videoIndexed() if any of its scenes exist, so every frame reaching this point is new.
     const resizedPath = inputPath.replace('.jpg', '_resized.jpg');
     const desc = await describeFrame(processor, resizedPath, offsetSeconds);
     if (isCreditsDescription(desc)) {
@@ -145,12 +142,23 @@ async function analyzeAndStore(file: string, index: number, total: number, video
     return { description: desc, videoPath, offsetSeconds, embedding };
 }
 
-async function flushBatch(db: LanceDBClient, batch: PendingScene[]) {
+let currentDb: LanceDBClient | null = null;
+let currentBatch: PendingScene[] | null = null;
+let wroteAnyScenes = false;
+
+async function safeFlush(db: LanceDBClient, batch: PendingScene[]) {
     if (batch.length === 0) {
         return;
     }
-    await db.upsertScenes(batch);
-    batch.length = 0;
+    try {
+        await db.upsertScenes(batch);
+        wroteAnyScenes = true;
+        batch.length = 0;
+    }
+    catch (error) {
+        console.error(`  Failed to write batch of ${batch.length} scene(s) — dropping and continuing.`, error instanceof Error ? error.message : String(error));
+        batch.length = 0;
+    }
 }
 
 function parseFrameNumber(file: string): number {
@@ -162,29 +170,45 @@ function parseFrameNumber(file: string): number {
 }
 
 async function processVideo(videoPath: string, db: LanceDBClient, processor: ImageProcessor) {
-    const outputDir = config.ffmpeg.outputDir;
     console.log(`\nProcessing: ${videoPath}`);
+    if (await db.videoIndexed(videoPath)) {
+        console.log(`  Already indexed — skipping.`);
+        return;
+    }
+    const outputDir = config.ffmpeg.outputDir;
     const files = await extractFrames(videoPath, outputDir);
     if (files.length === 0) {
         console.warn(`  No frames extracted from ${videoPath}`);
         return;
     }
     const batch: PendingScene[] = [];
+    currentDb = db;
+    currentBatch = batch;
     for (let i = 0; i < files.length; i++) {
-        const scene = await processSingleFrame(files[i], i, files.length, videoPath, outputDir, db, processor);
+        const scene = await processSingleFrame(files[i], i, files.length, videoPath, outputDir, processor);
         if (scene) {
             batch.push(scene);
         }
         if (batch.length >= config.lancedb.batchSize) {
-            await flushBatch(db, batch);
+            await safeFlush(db, batch);
         }
     }
-    await flushBatch(db, batch);
-    await db.optimize();
-    console.log(`  Optimized LanceDB table after ${videoPath}.`);
+    await safeFlush(db, batch);
+    currentBatch = null;
+}
+
+async function flushOnSignal(signal: string) {
+    console.log(`\nReceived ${signal} — flushing pending batch before exit...`);
+    if (currentDb && currentBatch && currentBatch.length > 0) {
+        await safeFlush(currentDb, currentBatch);
+    }
+    process.exit(130);
 }
 
 async function run() {
+    process.on('SIGINT', () => void flushOnSignal('SIGINT'));
+    process.on('SIGTERM', () => void flushOnSignal('SIGTERM'));
+
     const target = process.argv[2];
     if (!target) {
         printUsage();
@@ -207,6 +231,15 @@ async function run() {
     await db.init();
     for (const videoPath of videos) {
         await processVideo(videoPath, db, processor);
+    }
+    if (wroteAnyScenes) {
+        try {
+            await db.optimize();
+            console.log('\nOptimized LanceDB table.');
+        }
+        catch (error) {
+            console.error('Failed to optimize LanceDB table:', error instanceof Error ? error.message : String(error));
+        }
     }
     console.log('\nDone.');
 }

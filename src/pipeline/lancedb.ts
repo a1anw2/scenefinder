@@ -43,17 +43,15 @@ export class LanceDBClient {
         if (rows.length === 0) {
             return [];
         }
-        const ids = rows.map(() => `scene_${crypto.randomUUID()}`);
-        await this.table.add(
-            rows.map((row, i) => ({
-                id: ids[i],
-                vector: new Float32Array(row.embedding),
-                description: row.description,
-                video_path: row.videoPath,
-                offset_seconds: row.offsetSeconds,
-            })),
-        );
-        return ids;
+        const records = rows.map((row) => ({
+            id: `scene_${crypto.randomUUID()}`,
+            vector: new Float32Array(row.embedding),
+            description: row.description,
+            video_path: row.videoPath,
+            offset_seconds: row.offsetSeconds,
+        }));
+        await this.table.add(records);
+        return records.map((record) => record.id);
     }
 
     async searchScenes(query: string, embedding: number[], limit = 5) {
@@ -69,18 +67,20 @@ export class LanceDBClient {
         if (!this.table) {
             throw new Error('LanceDB table not initialized');
         }
-        // deleteUnverified is safe only because this client is the sole writer (embedded, single-process);
-        // without it, compacted-away fragments and old versions stay on disk for 7 days regardless of cleanupOlderThan.
+        // deleteUnverified is safe only because this client is the sole writer (embedded, single-process)
+        // and callers invoke this once per run, not mid-ingest, to keep the unsafe window as small as
+        // possible; without it, compacted-away fragments and old versions stay on disk for 7 days
+        // regardless of cleanupOlderThan. Avoid running `npm run search`/`npm run compact` while this
+        // is in flight.
         return this.table.optimize({ cleanupOlderThan: new Date(), deleteUnverified: true });
     }
 
-    async sceneExists(videoPath: string, offsetSeconds: number): Promise<boolean> {
+    async videoIndexed(videoPath: string): Promise<boolean> {
         if (!this.table) {
             throw new Error('LanceDB table not initialized');
         }
         const escapedPath = videoPath.replace(/'/g, "''");
-        const filter = `video_path = '${escapedPath}' AND offset_seconds = ${offsetSeconds}`;
-        const count = await this.table.countRows(filter);
+        const count = await this.table.countRows(`video_path = '${escapedPath}'`);
         return count > 0;
     }
 
